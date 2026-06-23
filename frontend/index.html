@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InvestPilot — A股投资助手</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f4; --surface: #ffffff; --border: rgba(0,0,0,0.08);
+    --text: #1a1a1a; --muted: #666; --hint: #999;
+    --blue: #185FA5; --blue-bg: #E6F1FB; --blue-text: #0C447C;
+    --green: #3B6D11; --green-bg: #EAF3DE;
+    --red: #A32D2D; --red-bg: #FCEBEB;
+    --amber: #633806; --amber-bg: #FAEEDA;
+    --radius: 8px; --radius-lg: 12px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+         background: var(--bg); color: var(--text); font-size: 14px; }
+  .app { display: flex; height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar { width: 196px; background: var(--surface); border-right: 0.5px solid var(--border);
+             display: flex; flex-direction: column; flex-shrink: 0; }
+  .logo { padding: 16px; border-bottom: 0.5px solid var(--border); }
+  .logo-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .logo-sub { font-size: 11px; color: var(--hint); margin-top: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 9px; padding: 10px 16px;
+              font-size: 13px; color: var(--muted); cursor: pointer;
+              border-left: 2px solid transparent; transition: all .15s; user-select: none; }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { color: var(--blue); border-left-color: var(--blue);
+                     background: var(--blue-bg); font-weight: 500; }
+  .nav-item i { font-size: 17px; }
+  .sidebar-bottom { margin-top: auto; padding: 12px 16px; border-top: 0.5px solid var(--border);
+                    font-size: 11px; color: var(--hint); }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .topbar { background: var(--surface); border-bottom: 0.5px solid var(--border);
+            padding: 0 20px; height: 52px; display: flex; align-items: center;
+            justify-content: space-between; flex-shrink: 0; }
+  .topbar-title { font-size: 15px; font-weight: 500; }
+  .index-pills { display: flex; gap: 10px; }
+  .index-pill { font-size: 12px; padding: 3px 10px; border-radius: 20px;
+                display: flex; align-items: center; gap: 4px; font-weight: 500; }
+  .index-pill.up { background: var(--green-bg); color: var(--green); }
+  .index-pill.down { background: var(--red-bg); color: var(--red); }
+  .index-pill.flat { background: var(--bg); color: var(--muted); }
+  .content { flex: 1; overflow-y: auto; padding: 20px; }
+
+  /* ── Pages ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Cards ── */
+  .card { background: var(--surface); border: 0.5px solid var(--border);
+          border-radius: var(--radius-lg); padding: 16px 20px; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--text); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+
+  /* ── Metric cards ── */
+  .metric { background: var(--bg); border-radius: var(--radius); padding: 14px 16px; }
+  .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .metric-val { font-size: 22px; font-weight: 500; }
+  .metric-sub { font-size: 11px; margin-top: 3px; color: var(--muted); }
+  .up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--muted); }
+
+  /* ── Table ── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { font-size: 11px; font-weight: 500; color: var(--muted); padding: 7px 10px;
+            text-align: left; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+  .tbl td { padding: 9px 10px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr:hover td { background: var(--bg); }
+
+  /* ── Buttons / Inputs ── */
+  .btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px;
+         border: 0.5px solid var(--border); border-radius: var(--radius);
+         font-size: 13px; cursor: pointer; background: var(--surface); color: var(--text);
+         transition: all .15s; }
+  .btn:hover { background: var(--bg); }
+  .btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn-primary:hover { background: var(--blue-text); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-danger { background: var(--red-bg); border-color: var(--red-bg); color: var(--red); }
+  input, select { padding: 7px 10px; border: 0.5px solid var(--border);
+                  border-radius: var(--radius); font-size: 13px;
+                  background: var(--surface); color: var(--text); outline: none; }
+  input:focus, select:focus { border-color: var(--blue); }
+
+  /* ── Tags ── */
+  .tag { display: inline-flex; align-items: center; font-size: 11px; padding: 2px 8px;
+         border-radius: 20px; font-weight: 500; }
+  .tag-blue { background: var(--blue-bg); color: var(--blue-text); }
+  .tag-green { background: var(--green-bg); color: var(--green); }
+  .tag-red { background: var(--red-bg); color: var(--red); }
+  .tag-amber { background: var(--amber-bg); color: var(--amber); }
+
+  /* ── Loading / Empty ── */
+  .loading { text-align: center; padding: 40px; color: var(--hint); font-size: 13px; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border);
+             border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite;
+             margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 40px; color: var(--hint); font-size: 13px; }
+
+  /* ── Stock ── */
+  .stock-search { display: flex; gap: 8px; margin-bottom: 16px; }
+  .stock-search input { flex: 1; }
+  .kv-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .kv-table td { padding: 7px 0; border-bottom: 0.5px solid var(--border); }
+  .kv-table tr:last-child td { border-bottom: none; }
+  .kv-table td:first-child { color: var(--muted); width: 110px; }
+  .kv-table td:last-child { font-weight: 500; text-align: right; }
+
+  /* ── Fund ── */
+  .fund-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
+  .fund-card { background: var(--surface); border: 0.5px solid var(--border);
+               border-radius: var(--radius-lg); padding: 14px 16px; cursor: pointer; transition: all .15s; }
+  .fund-card:hover { border-color: rgba(0,0,0,0.2); }
+  .fund-card.selected { border: 2px solid var(--blue); }
+  .fund-card-name { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+  .fund-card-code { font-size: 11px; color: var(--hint); }
+  .fund-card-stats { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; }
+  .fund-stat-label { color: var(--muted); margin-bottom: 2px; }
+
+  /* ── AI ── */
+  .ai-chat-box { min-height: 340px; max-height: 420px; overflow-y: auto;
+                 display: flex; flex-direction: column; gap: 10px; padding: 4px 0 12px; }
+  .bubble { max-width: 82%; padding: 9px 13px; border-radius: 12px; font-size: 13px; line-height: 1.7; }
+  .bubble.user { background: var(--blue); color: #fff; border-radius: 12px 12px 2px 12px;
+                 align-self: flex-end; }
+  .bubble.ai { background: var(--bg); border: 0.5px solid var(--border);
+               border-radius: 12px 12px 12px 2px; align-self: flex-start; white-space: pre-wrap; }
+  .typing-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+                background: var(--hint); animation: blink 1.2s infinite; margin: 0 1px; }
+  .typing-dot:nth-child(2) { animation-delay: .2s; }
+  .typing-dot:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+  .quick-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  /* ── Position ── */
+  .pos-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 16px; }
+  .pos-form .field { display: flex; flex-direction: column; gap: 4px; }
+  .pos-form .field label { font-size: 11px; color: var(--muted); }
+  .pos-form .field input { width: 110px; }
+  .pos-form .field input.short { width: 80px; }
+
+  /* ── Chart wrapper ── */
+  .chart-wrap { position: relative; width: 100%; height: 220px; }
+  .chart-wrap-sm { position: relative; width: 100%; height: 180px; }
+  .chart-wrap-lg { position: relative; width: 100%; height: 260px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ──────── Sidebar ──────── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-name"><i class="ti ti-chart-candle"></i> InvestPilot</div>
+      <div class="logo-sub">A 股个人投资助手</div>
+    </div>
+    <nav>
+      <div class="nav-item active" data-page="dashboard"><i class="ti ti-layout-dashboard"></i> 持仓看板</div>
+      <div class="nav-item" data-page="stock"><i class="ti ti-chart-line"></i> 股票分析</div>
+      <div class="nav-item" data-page="fund"><i class="ti ti-stack-2"></i> 基金分析</div>
+      <div class="nav-item" data-page="position"><i class="ti ti-wallet"></i> 持仓管理</div>
+      <div class="nav-item" data-page="ai"><i class="ti ti-robot"></i> AI 助手</div>
+    </nav>
+    <div class="sidebar-bottom">数据来源：AKShare · 仅供学习</div>
+  </aside>
+
+  <!-- ──────── Main ──────── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="page-title">持仓看板</div>
+      <div class="index-pills" id="index-pills">
+        <span class="index-pill flat"><span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span> 加载中</span>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- ══ 持仓看板 ══ -->
+      <div class="page active" id="page-dashboard">
+        <div class="grid-4" style="margin-bottom:14px;" id="dash-metrics">
+          <div class="metric"><div class="metric-label">总持仓市值</div><div class="metric-val" id="d-total">--</div></div>
+          <div class="metric"><div class="metric-label">总盈亏</div><div class="metric-val" id="d-pnl">--</div></div>
+          <div class="metric"><div class="metric-label">今日涨幅 (持仓均值)</div><div class="metric-val" id="d-today">--</div></div>
+          <div class="metric"><div class="metric-label">持仓笔数</div><div class="metric-val" id="d-count">--</div></div>
+        </div>
+        <div class="grid-2" style="margin-bottom:14px;">
+          <div class="card">
+            <div class="card-header"><span class="card-title">我的持仓</span>
+              <button class="btn btn-sm" onclick="navigate('position')"><i class="ti ti-plus"></i> 添加</button>
+            </div>
+            <div id="dash-holdings"><div class="empty"><i class="ti ti-database-off"></i><br>暂无持仓，先去添加</div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">今日涨幅榜 Top 10</span>
+              <button class="btn btn-sm" onclick="loadHotStocks()"><i class="ti ti-refresh"></i></button>
+            </div>
+            <div id="hot-stocks"><div class="loading"><span class="spinner"></span>加载中…</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">持仓盈亏构成</span></div>
+          <div class="chart-wrap-sm"><canvas id="pnl-chart" role="img" aria-label="持仓盈亏柱状图">持仓盈亏图表</canvas></div>
+        </div>
+      </div>
+
+      <!-- ══ 股票分析 ══ -->
+      <div class="page" id="page-stock">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="stock-search">
+            <input id="stock-code-input" placeholder="输入股票代码，如 300750" style="flex:1;" onkeydown="if(event.key==='Enter')searchStock()">
+            <button class="btn btn-primary" onclick="searchStock()"><i class="ti ti-search"></i> 查询</button>
+            <button class="btn" onclick="analyzeWithAI()"><i class="ti ti-sparkles"></i> AI 分析</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="stock-shortcuts">
+            <span class="tag tag-blue" style="cursor:pointer;" onclick="quickStock('300750')">宁德时代 300750</span>
+            <span class="tag tag-blue" style="cursor:pointer;" onclick="quickStock('600519')">贵州茅台 600519</span>
+            <span class="tag tag-blue" style="cursor:pointer;" onclick="quickStock('002594')">比亚迪 002594</span>
+            <span class="tag tag-blue" style="cursor:pointer;" onclick="quickStock('601398')">工商银行 601398</span>
+            <span class="tag tag-blue" style="cursor:pointer;" onclick="quickStock('688981')">中芯国际 688981</span>
+          </div>
+        </div>
+        <div id="stock-result" style="display:none;">
+          <div class="grid-2" style="margin-bottom:14px;">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title" id="kline-title">K 线图</span>
+                <div style="display:flex;gap:4px;">
+                  <button class="btn btn-sm" id="btn-daily" onclick="switchKline('daily')">日K</button>
+                  <button class="btn btn-sm" id="btn-weekly" onclick="switchKline('weekly')">周K</button>
+                  <button class="btn btn-sm" id="btn-monthly" onclick="switchKline('monthly')">月K</button>
+                </div>
+              </div>
+              <div class="chart-wrap-lg"><canvas id="kline-chart" role="img" aria-label="股票K线图">K线图</canvas></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="card-title">实时行情</span></div>
+              <table class="kv-table" id="quote-table"></table>
+            </div>
+          </div>
+          <div class="card" id="stock-ai-card" style="display:none;">
+            <div class="card-header"><span class="card-title"><i class="ti ti-robot" style="color:var(--blue);"></i> AI 智能分析</span><span class="tag tag-blue">claude-sonnet-4-6</span></div>
+            <div id="stock-ai-content"></div>
+          </div>
+        </div>
+        <div id="stock-placeholder" class="empty" style="margin-top:40px;">
+          <i class="ti ti-chart-candle" style="font-size:32px;color:var(--hint);display:block;margin-bottom:8px;"></i>
+          输入股票代码开始分析
+        </div>
+      </div>
+
+      <!-- ══ 基金分析 ══ -->
+      <div class="page" id="page-fund">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-header"><span class="card-title">基金排行（混合型 近1年）</span>
+            <button class="btn btn-sm" onclick="loadFundRank()"><i class="ti ti-refresh"></i></button>
+          </div>
+          <div id="fund-rank"><div class="loading"><span class="spinner"></span>加载中…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">净值走势 — <span id="selected-fund-name">请从上方选择基金</span></span>
+            <button class="btn btn-sm btn-primary" id="fund-ai-btn" onclick="analyzeFundWithAI()" style="display:none;"><i class="ti ti-sparkles"></i> AI 解读</button>
+          </div>
+          <div id="fund-nav-section">
+            <div class="empty">从上方排行中点击一只基金查看净值走势</div>
+          </div>
+          <div id="fund-ai-content" style="margin-top:14px;display:none;"></div>
+        </div>
+      </div>
+
+      <!-- ══ 持仓管理 ══ -->
+      <div class="page" id="page-position">
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-header"><span class="card-title">添加持仓记录</span></div>
+          <div class="pos-form">
+            <div class="field"><label>名称</label><input id="p-name" placeholder="宁德时代"></div>
+            <div class="field"><label>代码</label><input id="p-code" placeholder="300750" class="short"></div>
+            <div class="field"><label>买入价 (¥)</label><input id="p-buy" type="number" step="0.01" placeholder="165.00"></div>
+            <div class="field"><label>数量 (股)</label><input id="p-qty" type="number" placeholder="100" class="short"></div>
+            <div class="field"><label>当前价 (¥) <span style="color:var(--hint)">(可选)</span></label><input id="p-cur" type="number" step="0.01" placeholder="198.50"></div>
+            <button class="btn btn-primary" onclick="addPosition()" style="align-self:flex-end;"><i class="ti ti-plus"></i> 添加</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">持仓记录</span>
+            <div class="grid-4" style="gap:8px;width:auto;">
+              <div class="metric" style="padding:8px 12px;min-width:100px;"><div class="metric-label">总成本</div><div style="font-size:15px;font-weight:500;" id="p-total-cost">¥ 0</div></div>
+              <div class="metric" style="padding:8px 12px;min-width:100px;"><div class="metric-label">当前市值</div><div style="font-size:15px;font-weight:500;" id="p-total-val">¥ 0</div></div>
+              <div class="metric" style="padding:8px 12px;min-width:100px;"><div class="metric-label">总盈亏</div><div style="font-size:15px;font-weight:500;" id="p-total-pnl">¥ 0</div></div>
+              <div class="metric" style="padding:8px 12px;min-width:80px;"><div class="metric-label">笔数</div><div style="font-size:15px;font-weight:500;" id="p-count">0</div></div>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="tbl">
+              <thead><tr>
+                <th>名称</th><th>代码</th><th>买入价</th><th>当前价</th>
+                <th>数量</th><th>总成本</th><th>市值</th><th>盈亏</th><th>盈亏率</th><th></th>
+              </tr></thead>
+              <tbody id="pos-tbody"></tbody>
+            </table>
+            <div id="pos-empty" class="empty"><i class="ti ti-database-off"></i><br>暂无持仓记录</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ AI 助手 ══ -->
+      <div class="page" id="page-ai">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><i class="ti ti-robot" style="color:var(--blue);"></i> AI 投资助手</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="ai-status-badge"><span class="tag tag-amber"><span class="spinner" style="width:10px;height:10px;border-width:1.5px;"></span> 检查中…</span></span>
+              <button class="btn btn-sm" onclick="checkAiStatus()" title="刷新状态"><i class="ti ti-refresh"></i></button>
+            </div>
+          </div>
+          <div class="ai-chat-box" id="ai-chat"></div>
+          <div style="border-top:0.5px solid var(--border);padding-top:12px;margin-top:4px;">
+            <div style="display:flex;gap:8px;">
+              <input id="ai-input" placeholder="问我任何 A 股或基金投资问题…" style="flex:1;"
+                     onkeydown="if(event.key==='Enter')sendAiMsg()">
+              <button class="btn btn-primary" onclick="sendAiMsg()"><i class="ti ti-send"></i> 发送</button>
+            </div>
+            <div class="quick-btns">
+              <button class="btn btn-sm" onclick="quickAi('A股现在适合入场吗？')">A股适合入场吗</button>
+              <button class="btn btn-sm" onclick="quickAi('新能源板块近期走势如何？')">新能源板块走势</button>
+              <button class="btn btn-sm" onclick="quickAi('指数基金和主动基金怎么选？')">指数 vs 主动基金</button>
+              <button class="btn btn-sm" onclick="quickAi('如何用定投降低风险？')">定投策略</button>
+              <button class="btn btn-sm" onclick="quickAi('分析一下A股市场的估值水平')">A股估值分析</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════
+// 配置
+// ═══════════════════════════════════════════════
+const API = '';  // 同源，留空即可（FastAPI 同时托管前端）
+const AI_API = '/api/ai/chat';  // 后端转发 → Ollama deepseek-r1
+
+// ═══════════════════════════════════════════════
+// 工具函数
+// ═══════════════════════════════════════════════
+async function apiFetch(path) {
+  const res = await fetch(API + path);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `请求失败 ${res.status}`);
+  }
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(API + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.detail||'请求失败'); }
+  return res.json();
+}
+
+async function apiDelete(path) {
+  const res = await fetch(API + path, { method: 'DELETE' });
+  if (!res.ok) { throw new Error('删除失败'); }
+  return res.json();
+}
+
+function fmtNum(n, dec=2) {
+  if (n == null || isNaN(n)) return '--';
+  return Number(n).toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function fmtPct(n) {
+  if (n == null || isNaN(n)) return '--';
+  const s = Number(n).toFixed(2);
+  return (n > 0 ? '+' : '') + s + '%';
+}
+function colorClass(n) { return n > 0 ? 'up' : n < 0 ? 'down' : 'flat'; }
+
+function showToast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = `position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;
+    font-size:13px;z-index:9999;color:#fff;background:${type==='error'?'#A32D2D':'#185FA5'};
+    box-shadow:0 4px 12px rgba(0,0,0,.15);transition:opacity .3s;`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2500);
+}
+
+// ═══════════════════════════════════════════════
+// 导航
+// ═══════════════════════════════════════════════
+const PAGE_TITLES = { dashboard:'持仓看板', stock:'股票分析', fund:'基金分析', position:'持仓管理', ai:'AI 助手' };
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => navigate(item.dataset.page));
+});
+
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+  document.getElementById('page-title').textContent = PAGE_TITLES[page];
+  if (page === 'dashboard') refreshDashboard();
+  if (page === 'fund' && !window._fundRankLoaded) { loadFundRank(); window._fundRankLoaded = true; }
+  if (page === 'position') loadPositions();
+  if (page === 'ai') checkAiStatus();
+}
+
+// ═══════════════════════════════════════════════
+// 大盘指数
+// ═══════════════════════════════════════════════
+async function loadMarketIndex() {
+  try {
+    const data = await apiFetch('/api/market/index');
+    const pills = data.data.map(idx => {
+      const cls = idx.change_pct > 0 ? 'up' : idx.change_pct < 0 ? 'down' : 'flat';
+      return `<span class="index-pill ${cls}">${idx.name} ${fmtNum(idx.price,2)} <b>${fmtPct(idx.change_pct)}</b></span>`;
+    });
+    document.getElementById('index-pills').innerHTML = pills.join('');
+  } catch(e) {
+    document.getElementById('index-pills').innerHTML = '<span style="font-size:12px;color:var(--hint);">指数加载失败</span>';
+  }
+}
+
+// ═══════════════════════════════════════════════
+// 持仓看板
+// ═══════════════════════════════════════════════
+let pnlChart = null;
+
+async function refreshDashboard() {
+  loadHotStocks();
+  try {
+    const data = await apiFetch('/api/positions');
+    const positions = data.data || [];
+    renderDashMetrics(positions);
+    renderDashHoldings(positions);
+    renderPnlChart(positions);
+  } catch(e) {
+    document.getElementById('dash-holdings').innerHTML = `<div class="empty">加载失败：${e.message}</div>`;
+  }
+}
+
+function renderDashMetrics(positions) {
+  const total = positions.reduce((s,p) => s + (p.current_price||p.buy_price) * p.quantity, 0);
+  const cost  = positions.reduce((s,p) => s + p.buy_price * p.quantity, 0);
+  const pnl   = total - cost;
+  const todayPct = positions.length ? positions.reduce((s,p)=>s+(p.today_change_pct||0),0)/positions.length : 0;
+  document.getElementById('d-total').textContent = '¥ ' + fmtNum(total, 0);
+  const pnlEl = document.getElementById('d-pnl');
+  pnlEl.textContent = (pnl>=0?'+':'') + '¥ ' + fmtNum(Math.abs(pnl),0);
+  pnlEl.className = 'metric-val ' + colorClass(pnl);
+  const todayEl = document.getElementById('d-today');
+  todayEl.textContent = fmtPct(todayPct);
+  todayEl.className = 'metric-val ' + colorClass(todayPct);
+  document.getElementById('d-count').textContent = positions.length + ' 笔';
+}
+
+function renderDashHoldings(positions) {
+  const el = document.getElementById('dash-holdings');
+  if (!positions.length) { el.innerHTML = '<div class="empty">暂无持仓记录</div>'; return; }
+  el.innerHTML = `<table class="tbl">
+    <thead><tr><th>名称</th><th>当前价</th><th>盈亏</th><th>盈亏率</th></tr></thead>
+    <tbody>${positions.map(p => {
+      const cur = p.current_price || p.buy_price;
+      const pnl = (cur - p.buy_price) * p.quantity;
+      const pct = (cur - p.buy_price) / p.buy_price * 100;
+      return `<tr>
+        <td><b>${p.name}</b><br><span style="font-size:11px;color:var(--hint);">${p.code}</span></td>
+        <td>¥ ${fmtNum(cur)}</td>
+        <td class="${colorClass(pnl)}">${pnl>=0?'+':''}¥ ${fmtNum(Math.abs(pnl),0)}</td>
+        <td class="${colorClass(pct)}">${fmtPct(pct)}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+function renderPnlChart(positions) {
+  const el = document.getElementById('pnl-chart');
+  if (!positions.length) return;
+  if (pnlChart) pnlChart.destroy();
+  const labels = positions.map(p=>p.name);
+  const pnls = positions.map(p => {
+    const cur = p.current_price || p.buy_price;
+    return +((cur - p.buy_price) * p.quantity).toFixed(0);
+  });
+  const colors = pnls.map(v => v >= 0 ? 'rgba(59,109,17,0.75)' : 'rgba(163,45,45,0.75)');
+  pnlChart = new Chart(el, {
+    type: 'bar',
+    data: { labels, datasets: [{ label:'盈亏(¥)', data: pnls, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#999', font:{size:11} }, grid: { display:false } },
+        y: { ticks: { color:'#999', font:{size:11}, callback: v=>'¥'+v }, grid: { color:'rgba(128,128,128,.1)' } }
+      }
+    }
+  });
+}
+
+async function loadHotStocks() {
+  document.getElementById('hot-stocks').innerHTML = '<div class="loading"><span class="spinner"></span>加载中…</div>';
+  try {
+    const data = await apiFetch('/api/market/hot');
+    document.getElementById('hot-stocks').innerHTML = `<table class="tbl">
+      <thead><tr><th>#</th><th>名称</th><th>代码</th><th>现价</th><th>涨幅</th></tr></thead>
+      <tbody>${data.data.map((s,i)=>`<tr>
+        <td style="color:var(--hint);">${i+1}</td>
+        <td style="cursor:pointer;color:var(--blue);" onclick="navigate('stock');quickStock('${s.code}')">${s.name}</td>
+        <td style="color:var(--hint);">${s.code}</td>
+        <td>¥ ${fmtNum(s.price)}</td>
+        <td class="up"><b>${fmtPct(s.change_pct)}</b></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch(e) {
+    document.getElementById('hot-stocks').innerHTML = `<div class="empty">加载失败：${e.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// 股票分析
+// ═══════════════════════════════════════════════
+let klineChart = null;
+let currentStockCode = '';
+let currentQuoteData = null;
+
+function quickStock(code) {
+  document.getElementById('stock-code-input').value = code;
+  searchStock();
+}
+
+async function searchStock() {
+  const code = document.getElementById('stock-code-input').value.trim().replace(/\D/g, '');
+  if (!code) { showToast('请输入股票代码', 'error'); return; }
+  currentStockCode = code;
+  document.getElementById('stock-placeholder').style.display = 'none';
+  document.getElementById('stock-result').style.display = 'block';
+  document.getElementById('stock-ai-card').style.display = 'none';
+  document.getElementById('kline-title').textContent = 'K 线图加载中…';
+  document.getElementById('quote-table').innerHTML = '<tr><td colspan="2"><div class="loading"><span class="spinner"></span>加载中…</div></td></tr>';
+  await Promise.all([loadQuote(code), loadKline(code, 'daily')]);
+}
+
+async function loadQuote(code) {
+  try {
+    const d = await apiFetch(`/api/stock/quote?code=${code}`);
+    currentQuoteData = d;
+    document.getElementById('kline-title').textContent = `K 线图 — ${d.name} (${code})`;
+    const rows = [
+      ['最新价', `<span style="font-size:18px;font-weight:600;color:${d.change_pct>=0?'var(--green)':'var(--red)'}">¥ ${fmtNum(d.price)}</span>`],
+      ['涨跌幅', `<span class="${colorClass(d.change_pct)}">${fmtPct(d.change_pct)}</span>`],
+      ['今开 / 昨收', `¥ ${fmtNum(d.open)} / ¥ ${fmtNum(d.pre_close)}`],
+      ['最高 / 最低', `¥ ${fmtNum(d.high)} / ¥ ${fmtNum(d.low)}`],
+      ['成交额', `${fmtNum(d.amount)} 亿元`],
+      ['换手率', `${fmtNum(d.turnover)}%`],
+      ['总市值', `${fmtNum(d.market_cap)} 亿元`],
+      ['市盈率 (PE)', d.pe > 0 ? `${fmtNum(d.pe)}x` : '--'],
+      ['市净率 (PB)', d.pb > 0 ? `${fmtNum(d.pb)}x` : '--'],
+    ];
+    document.getElementById('quote-table').innerHTML = rows.map(([k,v]) =>
+      `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  } catch(e) {
+    document.getElementById('quote-table').innerHTML = `<tr><td colspan="2" style="color:var(--red)">获取行情失败：${e.message}</td></tr>`;
+  }
+}
+
+async function loadKline(code, period='daily') {
+  ['daily','weekly','monthly'].forEach(p => {
+    document.getElementById('btn-'+p).className = 'btn btn-sm' + (p===period?' btn-primary':'');
+  });
+  try {
+    const data = await apiFetch(`/api/stock/kline?code=${code}&period=${period}&limit=60`);
+    renderKline(data.data);
+  } catch(e) {
+    showToast('K线加载失败：' + e.message, 'error');
+  }
+}
+
+function switchKline(period) { if (currentStockCode) loadKline(currentStockCode, period); }
+
+function renderKline(kdata) {
+  const el = document.getElementById('kline-chart');
+  if (klineChart) klineChart.destroy();
+  const labels = kdata.map(d => d.date.slice(5)); // MM-DD
+  const opens  = kdata.map(d => d.open);
+  const closes = kdata.map(d => d.close);
+  const highs  = kdata.map(d => d.high);
+  const lows   = kdata.map(d => d.low);
+  klineChart = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '涨跌区间',
+          data: kdata.map((d,i) => [Math.min(d.open,d.close), Math.max(d.open,d.close)]),
+          backgroundColor: kdata.map(d => d.close >= d.open ? 'rgba(59,109,17,0.85)' : 'rgba(163,45,45,0.85)'),
+          borderSkipped: false, borderRadius: 1,
+        },
+        {
+          label: '最高价', type: 'line', data: highs,
+          borderColor: 'rgba(128,128,128,0.4)', pointRadius: 0, borderWidth: 0.8, tension: 0,
+        },
+        {
+          label: '最低价', type: 'line', data: lows,
+          borderColor: 'rgba(128,128,128,0.4)', pointRadius: 0, borderWidth: 0.8, tension: 0,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#999', font:{size:10}, maxTicksLimit:10 }, grid:{ display:false } },
+        y: { ticks: { color:'#999', font:{size:10}, callback: v=>'¥'+v }, grid:{ color:'rgba(128,128,128,.1)' } }
+      }
+    }
+  });
+}
+
+async function analyzeWithAI() {
+  if (!currentStockCode) { showToast('请先查询股票', 'error'); return; }
+  const card = document.getElementById('stock-ai-card');
+  const content = document.getElementById('stock-ai-content');
+  card.style.display = 'block';
+  const d = currentQuoteData;
+  const prompt = d
+    ? `你是专业A股分析师。请对以下股票给出简洁的投资分析报告（250字左右，分3-4个要点）：
+股票：${d.name}（${d.code}）
+实时数据：现价¥${d.price}，涨跌${fmtPct(d.change_pct)}，PE ${d.pe}x，PB ${d.pb}x，总市值${d.market_cap}亿，换手率${d.turnover}%
+请从：估值水平、技术面信号、主要风险、操作建议 四个角度分析。
+⚠️ 声明：本分析仅供学习参考，不构成投资建议，股市有风险，投资需谨慎。`
+    : `请简要分析A股股票 ${currentStockCode} 的投资价值。`;
+  await callClaude(prompt, content);
+}
+
+// ═══════════════════════════════════════════════
+// 基金分析
+// ═══════════════════════════════════════════════
+let fundNavChart = null;
+let currentFundCode = '';
+let currentFundName = '';
+
+async function loadFundRank() {
+  document.getElementById('fund-rank').innerHTML = '<div class="loading"><span class="spinner"></span>加载中…</div>';
+  try {
+    const data = await apiFetch('/api/fund/rank?category=混合型');
+    const fundRows = data.data.map(f => {
+      const safeName = f.name.replace(/'/g, '’');
+      const y1Class = f.return_1y && f.return_1y.includes('-') ? 'down' : 'up';
+      const y3Class = f.return_3y && f.return_3y.includes('-') ? 'down' : 'up';
+      return '<tr>' +
+        '<td style="color:var(--hint);">' + f.code + '</td>' +
+        '<td style="max-width:180px;">' + f.name + '</td>' +
+        '<td>' + f.nav + '</td>' +
+        '<td class="' + y1Class + '">' + f.return_1y + '</td>' +
+        '<td class="' + y3Class + '">' + f.return_3y + '</td>' +
+        '<td style="color:var(--muted);">' + f.manager + '</td>' +
+        '<td><button class="btn btn-sm" onclick="selectFund(' + "'" + f.code + "','" + '" + safeName + "'" + ')">查看净值</button></td>' +
+        '</tr>';
+    }).join('');
+    document.getElementById('fund-rank').innerHTML =
+      '<div style="overflow-x:auto;"><table class="tbl">' +
+      '<thead><tr><th>基金代码</th><th>基金名称</th><th>单位净値</th><th>近1年</th><th>近3年</th><th>基金经理</th><th></th></tr></thead>' +
+      '<tbody>' + fundRows + '</tbody></table></div>';
+  } catch(e) {
+    document.getElementById('fund-rank').innerHTML = '<div class="empty">加载失败：' + e.message + '</div>';
+  }
+}
+
+async function selectFund(code, name) {
+  currentFundCode = code;
+  currentFundName = name;
+  document.getElementById('selected-fund-name').textContent = name;
+  document.getElementById('fund-ai-btn').style.display = 'inline-flex';
+  document.getElementById('fund-ai-content').style.display = 'none';
+  const section = document.getElementById('fund-nav-section');
+  section.innerHTML = '<div class="loading"><span class="spinner"></span>加载净值走势…</div>';
+  try {
+    const data = await apiFetch(`/api/fund/nav?code=${code}&limit=90`);
+    section.innerHTML = '<div class="chart-wrap-lg"><canvas id="fund-nav-chart" role="img" aria-label="基金净值走势">基金净值走势</canvas></div>';
+    if (fundNavChart) fundNavChart.destroy();
+    const labels = data.data.map(d => d.date.slice(5));
+    const navs   = data.data.map(d => d.nav);
+    fundNavChart = new Chart(document.getElementById('fund-nav-chart'), {
+      type: 'line',
+      data: { labels, datasets: [{ label:'单位净值', data: navs, borderColor:'#534AB7',
+        backgroundColor:'rgba(83,74,183,0.07)', fill:true, tension:0.3, pointRadius:0, borderWidth:1.5 }] },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ ticks:{color:'#999',font:{size:10},maxTicksLimit:10}, grid:{display:false} },
+          y:{ ticks:{color:'#999',font:{size:10},callback:v=>v.toFixed(3)}, grid:{color:'rgba(128,128,128,.1)'} }
+        }
+      }
+    });
+  } catch(e) {
+    section.innerHTML = `<div class="empty">净值加载失败：${e.message}</div>`;
+  }
+}
+
+async function analyzeFundWithAI() {
+  if (!currentFundCode) return;
+  const content = document.getElementById('fund-ai-content');
+  content.style.display = 'block';
+  const prompt = `你是专业基金研究员。请对以下基金给出简洁分析报告（200字左右）：
+基金：${currentFundName}（${currentFundCode}）
+请从：基金风格特征、适合的投资者类型、持有建议（持有期限、是否适合定投）、主要风险 四点说明。
+⚠️ 仅供学习参考，不构成投资建议。`;
+  await callClaude(prompt, content);
+}
+
+// ═══════════════════════════════════════════════
+// 持仓管理
+// ═══════════════════════════════════════════════
+async function loadPositions() {
+  try {
+    const data = await apiFetch('/api/positions');
+    renderPositions(data.data || []);
+  } catch(e) {
+    showToast('加载持仓失败：' + e.message, 'error');
+  }
+}
+
+async function addPosition() {
+  const name = document.getElementById('p-name').value.trim();
+  const code = document.getElementById('p-code').value.trim();
+  const buy_price = parseFloat(document.getElementById('p-buy').value);
+  const quantity = parseInt(document.getElementById('p-qty').value);
+  const current_price = parseFloat(document.getElementById('p-cur').value) || null;
+  if (!name || !code || isNaN(buy_price) || isNaN(quantity)) {
+    showToast('请填写完整：名称、代码、买入价、数量', 'error'); return;
+  }
+  try {
+    await apiPost('/api/positions', { name, code, buy_price, quantity, current_price });
+    ['p-name','p-code','p-buy','p-qty','p-cur'].forEach(id => document.getElementById(id).value = '');
+    showToast('添加成功');
+    loadPositions();
+  } catch(e) {
+    showToast('添加失败：' + e.message, 'error');
+  }
+}
+
+async function deletePosition(id) {
+  if (!confirm('确认删除这条持仓记录？')) return;
+  try {
+    await apiDelete(`/api/positions/${id}`);
+    showToast('已删除');
+    loadPositions();
+  } catch(e) {
+    showToast('删除失败', 'error');
+  }
+}
+
+function renderPositions(positions) {
+  const tbody = document.getElementById('pos-tbody');
+  const empty = document.getElementById('pos-empty');
+  if (!positions.length) { tbody.innerHTML = ''; empty.style.display = 'block'; updatePosSummary([]); return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = positions.map(p => {
+    const cur = p.current_price || p.buy_price;
+    const cost = p.buy_price * p.quantity;
+    const val  = cur * p.quantity;
+    const pnl  = val - cost;
+    const pct  = (pnl / cost) * 100;
+    return `<tr>
+      <td><b>${p.name}</b></td>
+      <td style="color:var(--hint);">${p.code}</td>
+      <td>¥ ${fmtNum(p.buy_price)}</td>
+      <td>¥ ${fmtNum(cur)}</td>
+      <td>${p.quantity}</td>
+      <td>¥ ${fmtNum(cost,0)}</td>
+      <td>¥ ${fmtNum(val,0)}</td>
+      <td class="${colorClass(pnl)}">${pnl>=0?'+':''}¥ ${fmtNum(Math.abs(pnl),0)}</td>
+      <td class="${colorClass(pct)}">${fmtPct(pct)}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="deletePosition(${p.id})"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+  updatePosSummary(positions);
+}
+
+function updatePosSummary(positions) {
+  const cost = positions.reduce((s,p)=>s+p.buy_price*p.quantity,0);
+  const val  = positions.reduce((s,p=>s+(p.current_price||p.buy_price)*p.quantity),0);
+  const pnl  = val - cost;
+  document.getElementById('p-total-cost').textContent = '¥ ' + fmtNum(cost,0);
+  document.getElementById('p-total-val').textContent  = '¥ ' + fmtNum(val,0);
+  const pnlEl = document.getElementById('p-total-pnl');
+  pnlEl.textContent = (pnl>=0?'+':'') + '¥ ' + fmtNum(Math.abs(pnl),0);
+  pnlEl.className = colorClass(pnl);
+  document.getElementById('p-count').textContent = positions.length;
+}
+
+// ═══════════════════════════════════════════════
+// AI 助手（本地 Ollama deepseek-r1，后端转发）
+// ═══════════════════════════════════════════════
+const aiHistory = [];
+
+/** 通用 AI 调用：单次问答，结果渲染到 targetEl */
+async function callClaude(prompt, targetEl) {
+  targetEl.innerHTML = `<div style="padding:12px 0;color:var(--muted);font-size:13px;">
+    <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+    &nbsp;deepseek-r1 思考中…</div>`;
+  try {
+    const res = await fetch(AI_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `后端错误 ${res.status}`);
+    }
+    const data = await res.json();
+    targetEl.innerHTML = `<div style="font-size:13px;line-height:1.75;white-space:pre-wrap;">${data.reply}</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--hint);">
+        <i class="ti ti-cpu"></i> ${data.model || 'deepseek-r1'} · 本地推理</div>`;
+  } catch(e) {
+    targetEl.innerHTML = `<div style="color:var(--red);font-size:13px;">
+      <i class="ti ti-alert-circle"></i> AI 分析失败：${e.message}<br>
+      <small>请确认 <code>ollama serve</code> 已启动，且已拉取 deepseek-r1 模型</small></div>`;
+  }
+}
+
+function quickAi(q) { document.getElementById('ai-input').value = q; sendAiMsg(); }
+
+async function sendAiMsg() {
+  const input = document.getElementById('ai-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  appendBubble('user', msg);
+  aiHistory.push({ role: 'user', content: msg });
+  const bubble = appendBubble('ai', null);
+  try {
+    const res = await fetch(AI_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [...aiHistory] })  // 带完整历史实现多轮
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `后端错误 ${res.status}`);
+    }
+    const data = await res.json();
+    bubble.innerHTML = `<span style="white-space:pre-wrap;">${data.reply}</span>
+      <div style="margin-top:6px;font-size:10px;opacity:.5;">
+        <i class="ti ti-cpu"></i> ${data.model || 'deepseek-r1'}</div>`;
+    aiHistory.push({ role: 'assistant', content: data.reply });
+  } catch(e) {
+    bubble.innerHTML = `<span style="color:var(--red)">
+      <i class="ti ti-alert-circle"></i> 请求失败：${e.message}</span>`;
+  }
+}
+
+/** 检查 Ollama 服务状态，在 AI 页面显示状态指示 */
+async function checkAiStatus() {
+  const badge = document.getElementById('ai-status-badge');
+  if (!badge) return;
+  try {
+    const data = await apiFetch('/api/ai/status');
+    if (data.ollama_running && data.model_ready) {
+      badge.innerHTML = `<span class="tag tag-green"><i class="ti ti-circle-filled" style="font-size:8px;"></i> ${data.model} 已就绪</span>`;
+    } else if (data.ollama_running) {
+      badge.innerHTML = `<span class="tag tag-amber"><i class="ti ti-alert-triangle" style="font-size:10px;"></i> Ollama 运行中，但未找到 ${data.model}</span>`;
+    } else {
+      badge.innerHTML = `<span class="tag tag-red"><i class="ti ti-alert-circle" style="font-size:10px;"></i> Ollama 未启动</span>`;
+    }
+  } catch(e) {
+    badge.innerHTML = `<span class="tag tag-red">状态检查失败</span>`;
+  }
+}
+
+function appendBubble(role, text) {
+  const chat = document.getElementById('ai-chat');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `display:flex;justify-content:${role==='user'?'flex-end':'flex-start'};`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + role;
+  if (text) { bubble.textContent = text; }
+  else { bubble.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>'; }
+  wrap.appendChild(bubble);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+  return bubble;
+}
+
+// ═══════════════════════════════════════════════
+// 初始化
+// ═══════════════════════════════════════════════
+loadMarketIndex();
+refreshDashboard();
+checkAiStatus();
+</script>
+</body>
+</html>
